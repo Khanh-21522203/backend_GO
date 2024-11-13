@@ -22,17 +22,20 @@ type User struct {
 
 type UserRepo interface {
 	GetByID(ctx context.Context, userID string) (*User, error)
-	Add(ctx context.Context, u *User, node *snowflake.Node) (string, error)
-	Update(ctx context.Context, u *User) error
+	Add(ctx context.Context, u *User) (string, error)
+	Update(ctx context.Context, u *User) (string, error)
 }
 
 type UserStore struct {
-	db *sql.DB
+	UserRepo
+	db   *sql.DB
+	node *snowflake.Node
 }
 
-func NewUserStore(db *sql.DB) *UserStore {
+func NewUserStore(db *sql.DB, node *snowflake.Node) *UserStore {
 	return &UserStore{
-		db: db,
+		db:   db,
+		node: node,
 	}
 }
 
@@ -41,12 +44,10 @@ func (us *UserStore) GetByID(ctx context.Context, userID string) (*User, error) 
 
 	err := WithTransaction(us.db, func(tx *sql.Tx) error {
 		query := `
-			SELECT ID, user_name, first_name, last_name FROM USERS
+			SELECT first_name, last_name FROM USERS
 			WHERE ID = $1
 		`
 		return tx.QueryRow(query, userID).Scan(
-			&user.ID,
-			&user.Username,
 			&user.Firstname,
 			&user.Lastname,
 		)
@@ -59,7 +60,7 @@ func (us *UserStore) GetByID(ctx context.Context, userID string) (*User, error) 
 	return &user, nil
 }
 
-func (us *UserStore) Add(ctx context.Context, u *User, node *snowflake.Node) (string, error) {
+func (us *UserStore) Add(ctx context.Context, u *User) (string, error) {
 	var id string
 
 	err := WithTransaction(us.db, func(tx *sql.Tx) error {
@@ -71,7 +72,7 @@ func (us *UserStore) Add(ctx context.Context, u *User, node *snowflake.Node) (st
 			return ErrUsernameExist
 		}
 
-		snowflakeID := node.Generate()
+		snowflakeID := us.node.Generate()
 
 		salt, err := generateSalt(16)
 		if err != nil {
@@ -96,14 +97,14 @@ func (us *UserStore) Add(ctx context.Context, u *User, node *snowflake.Node) (st
 	return id, nil
 }
 
-func (us *UserStore) Update(ctx context.Context, u *User) error {
+func (us *UserStore) Update(ctx context.Context, u *User) (string, error) {
 	err := WithTransaction(us.db, func(tx *sql.Tx) error {
 		updateQuery := `
 			UPDATE USERS
-			SET first_name = $1, last_name = $2, user_name = $3
-			WHERE ID = $4
+			SET first_name = $1, last_name = $2
+			WHERE ID = $3
 		`
-		res, err := tx.ExecContext(ctx, updateQuery, u.Firstname, u.Lastname, u.Username, u.ID)
+		res, err := tx.ExecContext(ctx, updateQuery, u.Firstname, u.Lastname, u.ID)
 		if err != nil {
 			return err
 		}
@@ -119,7 +120,10 @@ func (us *UserStore) Update(ctx context.Context, u *User) error {
 		return nil
 	})
 
-	return err
+	if err != nil {
+		return "", err
+	}
+	return u.ID, nil
 }
 
 func (us *UserStore) isUsernameExist(ctx context.Context, username string) (bool, error) {

@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+option go_package = "internal/handlers/grpc_api";
+
+package user_api;
+
+// import "buf/validate/validate.proto";
+
+service GoFeedService {
+    rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {}
+    rpc GetUser(GetUserRequest) returns (GetUserResponse) {}
+    rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {}
+}
+
+message CreateUserRequest {  
+    string user_name = 1;
+    string password = 2;
+    string first_name = 3;
+    string last_name = 4;
+}
+
+message CreateUserResponse {
+    uint64 user_id = 1;
+}
+
+message GetUserRequest {
+    uint64 user_id = 1;
+}
+
+message GetUserResponse {
+    string first_name = 1;
+    string last_name = 2;
+}
+
+message UpdateUserRequest {
+    uint64 user_id = 1;
+    string first_name = 2;
+    string last_name = 3;
+}
+
+message UpdateUserResponse {
+    uint64 user_id = 1;
+}
+// protoc internal/handlers/grpc_api/gofeed.proto --go-grpc_out=.
+// protoc internal/handlers/grpc_api/gofeed.proto --go_out=.

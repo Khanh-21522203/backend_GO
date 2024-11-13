@@ -1,7 +1,7 @@
 package service
 
 import (
-	"httpServer/repository"
+	"GoFeed/internal/repository"
 )
 
 type CommentService struct {
